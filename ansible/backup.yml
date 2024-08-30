@@ -1,0 +1,130 @@
+- name: Configure backup
+  hosts: backup
+  become: true
+  vars:
+    master_address: "192.168.56.11"
+    master_port: "5432"
+    replica_address: "192.168.56.12"
+    barman_address: "192.168.56.13"
+    repl_user: "replicator"
+    repl_password: "Qwerty123"
+    barman_user: "barman"
+    barman_password: "Qwerty123"
+  tasks:
+
+    - name: Install packages
+      apt:
+        name: barman-cli
+        state: present
+        update_cache: true
+
+    - name: Install packages on barman
+      apt:
+        name:
+          - barman
+          - postgresql
+          - acl
+        state: present
+        update_cache: true
+      when: "ansible_hostname == 'barman'"
+
+    - name: Create ssh folder for postgres
+      file:
+        path: ~/.ssh
+        state: directory
+      become_user: "{{ become_usr }}"
+
+    - name: Generate SSH key on node1
+      openssh_keypair:
+        path: "~/.ssh/id_rsa"
+        type: rsa
+        size: 4096
+      become_user: "{{ become_usr }}"
+
+    - name: Fetch ssh pub keys
+      fetch:
+        src: ~/.ssh/id_rsa.pub
+        dest: "files/id_rsa.pub.{{ansible_hostname}}"
+        flat: true
+      become_user: "{{ become_usr }}"
+
+    - name: Add SSH public key to authorized_keys
+      authorized_key:
+        user: "{{ item.user }}"
+        state: present
+        key: "{{ lookup('file', item.key_path) }}"
+      with_items:
+        - { user: 'barman', key_path: 'files/id_rsa.pub.node1' }
+        - { user: 'postgres', key_path: 'files/id_rsa.pub.barman' }
+      when: "item.user == '{{ become_usr }}'"
+
+    - name: Create user for replication
+      postgresql_user:
+        name: "{{ barman_user }}"
+        password: "{{ barman_password }}"
+#        role_attr_flags: replication
+        role_attr_flags: superuser
+        state: present
+      become: true
+      become_user: postgres
+      when: "ansible_hostname == 'node1'"
+
+    - name: Copy pg_hba.conf
+      template:
+        src: pg_hba.conf2.j2
+        dest: /etc/postgresql/14/main/pg_hba.conf
+        owner: postgres
+        group: postgres
+        mode: 0640
+      when: "ansible_hostname == 'node1'"
+
+    - name: Restart postgresql service
+      systemd:
+        name: postgresql
+        state: restarted
+      when: "ansible_hostname == 'node1'"
+
+    - name: Create test table
+      postgresql_table:
+        db: otus
+        name: test
+        columns:
+          - id int
+          - name varchar(30)
+      become_user: postgres
+      when: "ansible_hostname == 'node1'"
+
+    - name: Insert into table
+      postgresql_query:
+        db: otus
+        query: INSERT INTO test VALUES (1, 'Alex')
+      become_user: postgres
+      when: "ansible_hostname == 'node1'"
+
+    - name: Copy pgpass to barman
+      template:
+        src: .pgpass.j2
+        dest: ~/.pgpass
+        owner: "{{ become_usr }}"
+        group: "{{ become_usr }}"
+        mode: 0600
+      become_user: "{{ become_usr }}"
+      when: 'ansible_hostname == "barman"'
+
+    - name: Copy barman.conf
+      template:
+        src: barman.conf.j2
+        dest: /etc/barman.conf
+        owner: root
+        group: root
+        mode: 0644
+      when: 'ansible_hostname == "barman"'
+
+    - name: Copy node1.conf
+      template:
+        src: node1.conf.j2
+        dest: /etc/barman.d/node1.conf
+        owner: root
+        group: root
+        mode: 0644
+      when: 'ansible_hostname == "barman"'
