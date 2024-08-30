@@ -128,3 +128,13 @@
         group: root
         mode: 0644
       when: 'ansible_hostname == "barman"'
+      
+    - name: barman switch-wal node1
+      shell: barman switch-wal node1
+      become_user: "{{ become_usr }}"
+      when: 'ansible_hostname == "barman"'
+
+    - name: barman cron
+      shell: barman cron
+      become_user: "{{ become_usr }}"
+      when: 'ansible_hostname == "barman"'
