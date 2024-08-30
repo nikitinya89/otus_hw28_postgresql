@@ -172,16 +172,16 @@ barman switch-wal node1
 barman cron
 barman backup node1
 ```
-![backups](backups.jpg)  
+![backups](img/backups.jpg)  
 
 Удалим базу _otus_ и попробуем восстановить из бэкапа:
-![drop](drop.jpg)  
+![drop](img/drop.jpg)  
 
-![restore](restore.jpg)  
+![restore](img/restore.jpg)  
  
 База восстановлена:  
 
-![check](check.jpg)  
+![check](img/check.jpg)  
 
 Для выполнения задания с помощью _ansible_ запустим плэйбук:
 ```bash
