@@ -127,3 +127,63 @@ CREATE USER barman WITH REPLICATION Encrypted PASSWORD 'Qwerty123';
 host    all                 barman       192.168.56.13/32      scram-sha-256
 host    replication         barman       192.168.56.13/32      scram-sha-256
 ```
+
+На хосте **barman** для подключения к БД создадим файл .pgpass и также конфигарционные файлы:
+#### ~/.pgpass
+```bash
+192.168.56.11:5432:*:barman:Qwerty123
+```
+#### /etc/barman.conf
+```bash
+[barman]
+barman_home = /var/lib/barman
+configuration_files_directory = /etc/barman.d
+barman_user = barman
+log_file = /var/log/barman/barman.log
+compression = gzip
+backup_method = rsync
+archiver = on
+retention_policy = REDUNDANCY 3
+immediate_checkpoint = true
+last_backup_maximum_age = 4 DAYS
+minimum_redundancy = 1
+```
+
+#### /etc/barman.d/node1.conf
+```bash
+[node1]
+description = "backup node1"
+ssh_command = ssh postgres@192.168.56.11 
+conninfo = host=192.168.57.11 user=barman port=5432 dbname=postgres
+retention_policy_mode = auto
+retention_policy = RECOVERY WINDOW OF 7 days
+wal_retention_policy = main
+streaming_archiver=on
+path_prefix = /usr/pgsql-14/bin/
+create_slot = auto
+slot_name = node1
+streaming_conninfo = host=192.168.57.11 user=barman 
+backup_method = postgres
+archiver = off
+```
+Настройка завершена. Запустим резервное копирование:
+```bash
+barman switch-wal node1
+barman cron
+barman backup node1
+```
+![backups](backups.jpg)  
+
+Удалим базу _otus_ и попробуем восстановить из бэкапа:
+![drop](drop.jpg)  
+
+![restore](restore.jpg)  
+ 
+База восстановлена:  
+
+![check](check.jpg)  
+
+Для выполнения задания с помощью _ansible_ запустим плэйбук:
+```bash
+ansible-playbook backup.yml
+```
