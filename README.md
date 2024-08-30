@@ -174,7 +174,7 @@ barman backup node1
 ```
 ![backups](img/backups.jpg)  
 
-Удалим базу _otus_ и попробуем восстановить из бэкапа:
+Удалим базу _otus_ и попробуем восстановить из бэкапа:  
 ![drop](img/drop.jpg)  
 
 ![restore](img/restore.jpg)  
